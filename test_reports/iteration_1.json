@@ -1,0 +1,49 @@
+{
+  "summary": "First-run comprehensive backend + light frontend smoke of Skoolzoom SaaS. Wrote 29 pytest cases covering Priority 1-2 flows. 28/29 pass. Two real backend bugs found: (1) /api/super-admin/audit-logs returns 500 due to ObjectId in nested before/after fields, (2) brute-force lockout is unreliable behind ingress because identifier uses raw client-IP which rotates across pod IPs on the same session. Frontend smoke confirms landing page, both quick-fill logins, and correct role-based sidebar.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/super-admin/audit-logs", "issue": "500 Internal Server Error — TypeError: 'ObjectId' object is not iterable. Audit docs contain nested `before`/`after` dicts that still hold a BSON ObjectId (e.g. submit_payment does `await audit(...after=doc)` while doc has been mutated by insert_one to include _id BEFORE doc.pop('_id') is called). Projection {'_id': 0} only strips top-level _id, not nested. Fix: either strip _id before passing to audit, or run a recursive cleanup, or serialize via jsonable_encoder with a custom bson encoder.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/auth/login (rate-limit / lockout)", "issue": "Brute-force lockout is effectively bypassable. `identifier = f\"{request.client.host}:{email}\"` — but behind the k8s ingress each request may hit a different backend pod IP (observed 10.49.136.2, 10.49.136.6, ...). Counter is split across identifiers so 5 wrong attempts almost never accumulate on one identifier; after 8 wrong attempts a correct password still succeeds. Fix: use X-Forwarded-For (real client IP) or just `email` as identifier; also consider using request.headers.get('x-forwarded-for','').split(',')[0].strip() with a fallback.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/super-admin/payments/{id}/approve", "issue": "New expiry = max(now, current_expiry) + duration_days. If school is still on trial with 7 days left, approving 365-day plan yields ~372 days. Spec said '≈ now + 365d'. Confirm business rule (either restart from now, or explicitly document that trial days are added as bonus)."},
+      {"endpoint": "seed / demo data", "issue": "_seed_demo_schools skips entirely if `schools` collection is non-empty (`count_documents() > 0`). Consequence: once a super-admin action mutates Iqra (extend/suspend/activate), the seeded 'trial ending in 3 days' state is lost forever and cannot be re-seeded without wiping the DB. Consider per-school idempotent upsert (like `_seed_super_admin`) so demo state can be refreshed."},
+      {"endpoint": "GET /api/school/subscription (Iqra)", "issue": "Iqra Model Academy now shows subscription_status='active' with days_remaining=13. Original spec expected trial ~3 days. Cause: contamination from earlier super-admin actions plus non-idempotent seed (see above)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Recharts containers on Landing/Dashboard", "issue": "Console warnings: 'width(-1) and height(-1) of chart should be greater than 0' — ResponsiveContainer missing min height/width for the small landing-hero stat cards.", "selector": "recharts-responsive-container", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "FIX: /api/super-admin/audit-logs 500 — recursively strip BSON _id from before/after payloads in audit(), OR call `bson.json_util.dumps` / project deeply, OR pop `_id` from doc BEFORE calling audit() in every route that passes `after=doc`.",
+    "FIX (security): Login lockout identifier — use X-Forwarded-For header (first IP) instead of `request.client.host`, or key lockout purely on email. Right now brute-force is effectively unrestricted.",
+    "REVIEW: Payment approval stacking behavior — decide if trial days should be added on top of purchased duration.",
+    "REVIEW: Make demo school seeding idempotent per-school (upsert) so trial-days state survives super-admin actions.",
+    "MINOR: Add min height/width to Recharts ResponsiveContainer on landing to silence warnings."
+  ],
+  "critical_code_review_comments": [
+    "routes_school.submit_payment (and others) call `await audit(..., after=doc)` AFTER `db.payments.insert_one(doc)` — motor has already mutated `doc` to include `_id: ObjectId(...)`. The `doc.pop('_id', None)` happens after audit(), so the audit document persists an ObjectId that breaks JSON serialization on read.",
+    "db._check_lockout / _bump_lockout key on `request.client.host` — unreliable behind k8s ingress. Also `_bump_lockout` resets `attempts` to 0 the moment it sets locked_until, which is fine, but pairs with the IP-rotation bug to make lockout completely bypassable in practice.",
+    "compute_school_status day-remaining rounding is inconsistent: `max(0, delta.days + (1 if delta.total_seconds() > 0 and delta.seconds > 0 else 0))` can yield either 6 or 7 depending on time of day — acceptable but might feel off in UI.",
+    "seed._seed_demo_schools guard `count_documents({}) > 0` prevents re-seeding demo state after any mutation. Consider per-school upserts and only creating missing users/classes.",
+    "CORS: allow_origins from CORS_ORIGINS defaults to '*' while allow_credentials=True; Starlette will refuse to send credentials when origin is '*'. Works today because .env sets specific origin — but the default is unsafe. Consider failing fast if credentials+wildcard combo detected."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "97% (28/29)", "frontend": "100% (smoke)"},
+  "test_credentials": "Used as provided in /app/memory/test_credentials.md — all confirmed working (super, both school admins, teacher).",
+  "seed_data_creation": "Tests create TEST_-prefixed schools/classes/students/exams/subjects via /api/auth/register-school and /api/school/*. No cleanup performed (safe: prefixed and unique). Demo schools NOT deleted.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend suite is at /app/backend/tests/backend_test.py; run with `pytest backend/tests/backend_test.py -v`. Only failing test is TestSuperAdmin::test_audit_logs which intentionally documents the 500 bug — will pass once main agent fixes ObjectId serialization. Iqra demo school has been contaminated (now 'active', not 'trial ~3d') — either wipe skoolzoom_db.schools/users to force reseed, or make seed idempotent. Frontend deeper testing (RTL toggle, dark-mode, teacher-role sidebar hiding, subscription page manual-payment flow) still pending — treated as Priority 3 smoke here.",
+  "rca of the issue": "Bug 1 (audit-logs 500): submit_payment in routes_school.py does `await db.payments.insert_one(doc)` (motor injects `_id: ObjectId`) then `await audit(..., after=doc)` (persists doc with ObjectId inside `after`) then `doc.pop('_id', None)`. Later GET /api/super-admin/audit-logs projects `{'_id': 0}` only on top level — the nested `_id` inside `after` survives, and FastAPI's jsonable_encoder can't serialize ObjectId → 500. Mitigation: `doc.pop('_id', None)` BEFORE audit(); apply everywhere that passes `after=doc`. Bug 2 (lockout): identifier keyed on `request.client.host` which is the immediate socket peer — behind k8s ingress this rotates across pods (verified in login_attempts collection showing same email under 10.49.136.2 and 10.49.136.6 with independent counters). Mitigation: derive client IP from `X-Forwarded-For` (first hop) or drop IP from identifier entirely."
+}

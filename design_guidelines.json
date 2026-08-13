@@ -1,0 +1,111 @@
+{
+  "theme": "hybrid_fullstack",
+  "mood": "Professional, Trustworthy, Modern SaaS, Oxford Academic but Tech-Forward",
+  "typography": {
+    "fonts": {
+      "english_heading": "Outfit",
+      "urdu_heading": "Noto Nastaliq Urdu",
+      "english_body": "Inter",
+      "urdu_body": "Noto Sans Arabic"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-tight",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl",
+      "h4": "text-lg sm:text-xl",
+      "body": "text-base",
+      "small": "text-sm",
+      "urdu_specific": "For Urdu text, increase line-height using leading-loose or leading-[1.8] to accommodate Nastaliq ascenders/descenders."
+    },
+    "guidelines": "Use 'Outfit' for English headings and 'Noto Nastaliq Urdu' for Urdu headings. Body text should use 'Inter' (English) or 'Noto Sans Arabic' (Urdu) for readability at small sizes. Ensure font-families are toggled based on the active language direction (dir='rtl' or 'ltr')."
+  },
+  "colors": {
+    "light": {
+      "background": "#F8FAFC",
+      "surface": "#FFFFFF",
+      "primary": "#047857",
+      "primary_hover": "#065F46",
+      "text_main": "#0F172A",
+      "text_muted": "#64748B",
+      "border": "#E2E8F0",
+      "accent_amber": "#F59E0B"
+    },
+    "dark": {
+      "background": "#0F172A",
+      "surface": "#1E293B",
+      "primary": "#10B981",
+      "primary_hover": "#34D399",
+      "text_main": "#F8FAFC",
+      "text_muted": "#94A3B8",
+      "border": "#334155",
+      "accent_amber": "#FBBF24"
+    },
+    "guidelines": "Avoid generic SaaS blue or purple. Rely on an organic 'Oxford/Emerald' palette for trust and educational authority. Avoid teal (#1B93A4) entirely. Use Amber for highlights, trials, and warnings."
+  },
+  "layouts": {
+    "global": "Always use CSS logical properties (ms-*, me-*, ps-*, pe-*, start-*, end-*) instead of physical left/right properties to seamlessly support LTR (English) and RTL (Urdu). The root or layout wrapper must toggle dir='ltr' or dir='rtl'.",
+    "marketing": {
+      "hero": "Bento-style or wide asymmetrical grid. Use generous spacing (py-24, py-32).",
+      "features": "Bento grid (grid-cols-1 md:grid-cols-3 lg:grid-cols-4) with glassmorphism cards.",
+      "footer": "Generous padding, large brand typography. MUST include developer branding: 'Developed by Zeeshan Computers Sheikh Fazal — 0343-0819382'."
+    },
+    "dashboard": {
+      "sidebar": "Collapsible side navigation. Use 'start-0' and logical borders.",
+      "grid": "High density grid. Use gap-4 or gap-6. Dashboard cards should have a max border-radius of 8px (rounded-lg).",
+      "cards": "Flat solid background in dark mode, crisp 1px borders (border-border). In health/academic data, prioritize flat colors over glassmorphism for data clarity.",
+      "tables": "Clean, dense tables with sticky headers. Add specific hover states on rows."
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "Use sparingly on marketing header/nav (backdrop-blur-xl bg-white/70 or bg-slate-900/70). NOT to be used for dashboard data cards.",
+    "shadows": "Subtle, layered shadows on light mode cards (shadow-sm). Use inner borders instead of shadows in dark mode.",
+    "borders": "1px solid borders using border-border. Cards should look crisp and structured."
+  },
+  "components": {
+    "buttons": "Pill-shaped (rounded-full) for marketing, rounded-md for dashboard. MUST include hover and active states (e.g., hover:bg-emerald-800 hover:text-white).",
+    "inputs": "Shadcn UI standard, rounded-md, ring-on-focus (focus:ring-2 focus:ring-emerald-500).",
+    "charts": "Recharts with responsive containers. Ensure tooltips use theme colors. Ensure colors are accessible.",
+    "icons": "lucide-react. Use stroke-width 1.5 for a premium, lightweight feel. Remember to flip directional icons in RTL (rtl:-scale-x-100 or rtl:rotate-180).",
+    "toast": "Use Sonner for all notifications (success, error, loading).",
+    "branding": "Include 'Developed by Zeeshan Computers Sheikh Fazal — 0343-0819382' in Login footer, main app footer, About page, and Subscription page (subtle text-sm text-muted-foreground)."
+  },
+  "motion": {
+    "hover": "Transition transform and background-color (transition-colors duration-200, hover:-translate-y-0.5 on cards).",
+    "page_load": "Framer motion for staggered entrance of dashboard widgets and marketing sections.",
+    "accessibility": "Respect prefers-reduced-motion."
+  },
+  "image_urls": {
+    "marketing_hero": {
+      "url": "https://images.unsplash.com/photo-1543269865-0a740d43b90c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwzfHxzdHVkZW50cyUyMGxlYXJuaW5nJTIwbGFwdG9wfGVufDB8fHx8MTc4NjYyODU1M3ww&ixlib=rb-4.1.0&q=85",
+      "description": "Two students collaborating on a laptop, perfect for LMS/Student portal hero."
+    },
+    "school_building": {
+      "url": "https://images.unsplash.com/photo-1584750153892-38414eb8e76a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBzY2hvb2wlMjBidWlsZGluZ3xlbnwwfHx8fDE3ODY2Mjg1NTh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern school building architecture, useful for marketing about page or super admin."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Ensure complete RTL support using logical CSS classes (e.g., ps-4 instead of pl-4, ms-auto instead of ml-auto).",
+    "Implement language toggle (English/Urdu) that switches both text content and the HTML dir attribute.",
+    "Use 'Outfit' and 'Noto Nastaliq Urdu' fonts conditionally based on the active language.",
+    "Ensure 'Developed by Zeeshan Computers Sheikh Fazal — 0343-0819382' is present in required footers.",
+    "Dashboard must be responsive, showing a mobile hamburger menu on small screens and a persistent sidebar on desktop.",
+    "Implement Light/Dark mode toggle.",
+    "Use standard Shadcn components from /app/frontend/src/components/ui/.",
+    "Never use `transparent` backgrounds for dropdowns or modals; always use a solid or glassmorphism background to ensure readability.",
+    "All interactive elements MUST have a `data-testid` attribute (e.g., data-testid='login-button').",
+    "Provide loading skeletons for dashboard cards and tables.",
+    "Use Recharts for revenue/attendance charts and lucide-react for icons."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not converge toward generic, 'on distribution' outputs. Avoid the 'AI slop' aesthetic.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "You MUST NOT apply universal transition (e.g., transition: all). Add transitions for specific properties.",
+    "You MUST NOT center align the app container (.App { text-align: center; }).",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations.",
+    "Prioritize using pre-existing components from src/components/ui.",
+    "Use `sonner` for toasts.",
+    "Avoid using emojis for icons. Use lucide-react.",
+    "Never use placeholder image URLs. Use the provided image_urls."
+  ]
+}

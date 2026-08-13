@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-en-heading: 'Outfit', system-ui, sans-serif;
+  --font-en-body: 'Inter', system-ui, sans-serif;
+  --font-ur-heading: 'Noto Nastaliq Urdu', serif;
+  --font-ur-body: 'Noto Sans Arabic', 'Inter', sans-serif;
+}
+
+html { font-family: var(--font-en-body); }
+html[lang="ur"] { font-family: var(--font-ur-body); }
+html[lang="ur"] h1, html[lang="ur"] h2, html[lang="ur"] h3,
+html[lang="ur"] .font-display { font-family: var(--font-ur-heading); line-height: 1.9; }
+h1, h2, h3, .font-display { font-family: var(--font-en-heading); letter-spacing: -0.01em; }
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 160 84% 24%;         /* emerald-800 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 45 93% 47%;           /* amber-500-ish */
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 160 84% 30%;
+    --chart-1: 160 84% 34%;
+    --chart-2: 45 93% 47%;
+    --chart-3: 199 89% 48%;
+    --chart-4: 262 60% 60%;
+    --chart-5: 340 82% 52%;
+    --radius: 0.65rem;
+  }
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 158 64% 52%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 45 93% 55%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 158 64% 52%;
+  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
+
+/* Custom UI touches */
+.grid-dots {
+  background-image: radial-gradient(circle at 1px 1px, rgba(6,95,70,0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+.dark .grid-dots {
+  background-image: radial-gradient(circle at 1px 1px, rgba(16,185,129,0.10) 1px, transparent 0);
+}
+.glass {
+  backdrop-filter: blur(16px);
+  background-color: hsl(var(--background) / 0.72);
+}
+.card-hover {
+  transition-property: transform, box-shadow, border-color;
+  transition-duration: 200ms;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -12px rgba(6,95,70,0.18);
+}
+/* RTL directional icons */
+[dir="rtl"] .rtl-flip { transform: scaleX(-1); }
+
+@layer base {
+  [data-debug-wrapper="true"] { display: contents !important; }
+  [data-debug-wrapper="true"] > * {
+    margin-left: inherit; margin-right: inherit; margin-top: inherit; margin-bottom: inherit;
+    padding-left: inherit; padding-right: inherit; padding-top: inherit; padding-bottom: inherit;
+    column-gap: inherit; row-gap: inherit; gap: inherit;
+    border-left-width: inherit; border-right-width: inherit;
+    border-top-width: inherit; border-bottom-width: inherit;
+    border-left-style: inherit; border-right-style: inherit;
+    border-top-style: inherit; border-bottom-style: inherit;
+    border-left-color: inherit; border-right-color: inherit;
+    border-top-color: inherit; border-bottom-color: inherit;
+  }
+}
