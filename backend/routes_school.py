@@ -172,12 +172,31 @@ async def create_subject(inp: SubjectIn, user=Depends(require_role("school_admin
     return doc
 
 
+async def _role_scope(db, user):
+    """Return (student_ids, class_ids) accessible to a parent/student user.
+    None => no restriction (admin/teacher/accountant see full school scope).
+    """
+    role = user["role"]
+    if role == "parent":
+        kids = await db.students.find({"school_id": user["school_id"], "parent_id": user["id"]}, {"_id": 0}).to_list(50)
+        return ([k["id"] for k in kids], list({k["class_id"] for k in kids if k.get("class_id")}))
+    if role == "student":
+        me = await db.students.find_one({"school_id": user["school_id"], "user_id": user["id"]}, {"_id": 0})
+        if me:
+            return ([me["id"]], [me["class_id"]] if me.get("class_id") else [])
+        return ([], [])
+    return (None, None)
+
+
 # ------------ Students ------------
 @router.get("/students")
 async def list_students(class_id: Optional[str] = None, q: Optional[str] = None,
                         user=Depends(require_school_active)):
     db = get_db()
     query = {"school_id": sid(user)}
+    stu_ids, class_ids = await _role_scope(db, user)
+    if stu_ids is not None:
+        query["id"] = {"$in": stu_ids}
     if class_id:
         query["class_id"] = class_id
     if q:
@@ -226,6 +245,10 @@ async def get_student(sid_: str, user=Depends(require_school_active)):
     db = get_db()
     s = await db.students.find_one({"id": sid_, "school_id": sid(user)}, {"_id": 0})
     if not s:
+        raise HTTPException(404, "Not found")
+    if user["role"] == "parent" and s.get("parent_id") != user["id"]:
+        raise HTTPException(404, "Not found")
+    if user["role"] == "student" and s.get("user_id") != user["id"]:
         raise HTTPException(404, "Not found")
     return s
 
@@ -334,6 +357,9 @@ async def get_attendance(class_id: str, date: str, section_id: Optional[str] = N
     q = {"school_id": sid(user), "class_id": class_id, "date": date}
     if section_id:
         q["section_id"] = section_id
+    stu_ids, _ = await _role_scope(db, user)
+    if stu_ids is not None:
+        q["student_id"] = {"$in": stu_ids}
     return await db.attendance.find(q, {"_id": 0}).to_list(1000)
 
 
@@ -402,7 +428,11 @@ async def pay_create(inp: FeePaymentIn, user=Depends(require_role("school_admin"
 @router.get("/fee-payments")
 async def pay_list(user=Depends(require_school_active)):
     db = get_db()
-    return await db.fee_payments.find({"school_id": sid(user)}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    q = {"school_id": sid(user)}
+    stu_ids, _ = await _role_scope(db, user)
+    if stu_ids is not None:
+        q["student_id"] = {"$in": stu_ids}
+    return await db.fee_payments.find(q, {"_id": 0}).sort("created_at", -1).to_list(5000)
 
 
 # ------------ Exams & Results ------------
@@ -475,6 +505,10 @@ async def results(exam_id: str, user=Depends(require_school_active)):
     rows.sort(key=lambda r: r["obtained"], reverse=True)
     for i, r in enumerate(rows):
         r["position"] = i + 1
+    # Apply role scoping — parents see only their kids' rows, students only their own row.
+    stu_ids, _ = await _role_scope(db, user)
+    if stu_ids is not None:
+        rows = [r for r in rows if r["student_id"] in stu_ids]
     return {"exam": exam, "results": rows}
 
 
@@ -495,6 +529,11 @@ async def tt_list(class_id: Optional[str] = None, teacher_id: Optional[str] = No
     q = {"school_id": sid(user)}
     if class_id: q["class_id"] = class_id
     if teacher_id: q["teacher_id"] = teacher_id
+    _, class_ids = await _role_scope(db, user)
+    if class_ids is not None:
+        if class_id and class_id not in class_ids:
+            return []
+        q["class_id"] = {"$in": class_ids}
     return await db.timetable.find(q, {"_id": 0}).to_list(5000)
 
 

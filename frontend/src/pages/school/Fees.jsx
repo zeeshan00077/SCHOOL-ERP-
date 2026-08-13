@@ -59,7 +59,10 @@ export default function Fees() {
                 <td className="px-4 py-3">PKR {(i.paid_amount||0).toLocaleString()}</td>
                 <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs ${i.status==="paid"?"bg-primary/10 text-primary":i.status==="partial"?"bg-accent/20":"bg-secondary"}`}>{i.status}</span></td>
                 <td className="px-4 py-3">{i.due_date}</td>
-                <td className="px-4 py-3">{i.status!=="paid" && <Button size="sm" variant="outline" onClick={()=>{setSelInv(i);setPay({amount:i.amount-(i.paid_amount||0), method:"cash", reference:""});setOpenPay(true);}} data-testid={`pay-${i.id}`}>Record payment</Button>}</td>
+                <td className="px-4 py-3 space-x-2">
+                  {i.status!=="paid" && <Button size="sm" variant="outline" onClick={()=>{setSelInv(i);setPay({amount:i.amount-(i.paid_amount||0), method:"cash", reference:""});setOpenPay(true);}} data-testid={`pay-${i.id}`}>Record payment</Button>}
+                  <Button size="sm" variant="ghost" onClick={()=>window.open(`/print/voucher/${i.id}`, "_blank")} data-testid={`voucher-${i.id}`}>Print voucher</Button>
+                </td>
               </tr>
             ))}
             {invoices.length === 0 && <tr><td colSpan={7} className="text-center text-muted-foreground py-10">No invoices yet</td></tr>}

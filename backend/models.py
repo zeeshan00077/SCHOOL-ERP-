@@ -29,7 +29,7 @@ class ResetIn(BaseModel):
 
 
 class SchoolUpdateIn(BaseModel):
-    name: Optional[str] = None
+    bank_instructions: Optional[str] = None
     logo_url: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
@@ -39,6 +39,7 @@ class SchoolUpdateIn(BaseModel):
     academic_session: Optional[str] = None
     currency: Optional[str] = None
     timezone: Optional[str] = None
+    name: Optional[str] = None
 
 
 class PlanIn(BaseModel):

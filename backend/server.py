@@ -18,6 +18,7 @@ from models import RegisterSchoolIn, LoginIn, ForgotIn, ResetIn
 from seed import seed_all
 from routes_super import router as super_router
 from routes_school import router as school_router
+from routes_extras import router as extras_router
 
 app = FastAPI(title="Skoolzoom School ERP SaaS")
 api = APIRouter(prefix="/api")
@@ -214,6 +215,7 @@ async def health():
 app.include_router(api)
 app.include_router(super_router)
 app.include_router(school_router)
+app.include_router(extras_router)
 
 app.add_middleware(
     CORSMiddleware,

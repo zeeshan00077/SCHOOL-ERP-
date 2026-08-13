@@ -1,0 +1,49 @@
+{
+  "summary": "Phase 2A regression + new-feature testing on Skoolzoom. Re-ran previous 29 tests (all PASS — audit-logs 500 and lockout bugs from iter1 are fixed). Added 23 new Phase 2A tests covering Change Password, Daily Diary (CRUD + role gating + parent/student scoping + tenant isolation), Fee Voucher (payload + parent/student scoping + cross-school 404), Result Card (payload + scoping + cross-school 404), and WhatsApp Reminders architecture (config, due-soon preview, dry-run does NOT falsely claim sent, logs, role gating). 22/23 new pass. 1 real security bug discovered: /api/school/students has NO parent/student role scoping — a parent authenticated user can list ALL students in the school (not just their own children). Frontend smoke: /app/diary, /app/reminders, /app/change-password, /print/voucher/:id, /print/result-card/:examId/:studentId all render cleanly. Sidebar filtering works: parent sees only Dashboard/Fees/Examinations/Timetable/Daily Diary/Notices/Change Password. Voucher prints 3 copies (School/Bank/Parent) with developer branding; Result Card renders subject table, totals, attendance, principal signature and branding.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/school/students (and likely /api/school/fee-invoices, /api/school/exams, /api/school/results/{exam_id}, /api/school/attendance, /api/school/marks)", "issue": "Parent-role and student-role scoping is NOT enforced on legacy Phase-1 endpoints. list_students() in routes_school.py only scopes by school_id — a parent authenticated with role=parent can enumerate every student in the school (verified: parent@greenvalley.edu received a student with parent_id=None). The review request calls this a HARD security requirement. Phase-2 endpoints (diary, voucher, result-card) do handle role scoping correctly; the older endpoints do not.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "seed / Iqra school", "issue": "Iqra Model Academy demo school still shows subscription_status=active instead of the intended 'trial ~3d ending' state. Seed guard uses count_documents({}) > 0 so re-seeding is skipped after any earlier super-admin mutation. Consider per-school idempotent upserts."},
+      {"endpoint": "POST /api/super-admin/payments/{id}/approve", "issue": "Approval stacks trial days onto purchased duration (~372 days for a 365d plan applied while 7d trial remains). Confirm intended business rule."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_phase2.py",
+    "/app/test_reports/pytest/pytest_iter2_baseline.xml",
+    "/app/test_reports/pytest/pytest_iter2_phase2.xml"
+  ],
+  "action_items": [
+    "SECURITY: Add role-based scoping to legacy school endpoints. In routes_school.py::list_students, when user['role']=='parent' restrict query to {'parent_id': user['id']}; when role=='student' restrict to {'user_id': user['id']} or {'id': user['student_id']}. Apply same pattern to /fee-invoices (parent → invoices for their children only), /results/{exam_id}, /marks, /attendance, /exams (parent/student should only see items for their class). Diary and voucher/card already do this — copy that pattern.",
+    "OPTIONAL: Make _seed_demo_schools per-school idempotent (upsert) so Iqra 'trial-ending' demo state can be restored without wiping DB.",
+    "OPTIONAL: Document/confirm the 'trial+plan stacking' behaviour on payment approval."
+  ],
+  "critical_code_review_comments": [
+    "routes_school.list_students / list_fee_invoices / list_exams / results endpoint (and similar) only filter by school_id — they do NOT branch on user['role'] the way routes_extras.diary_list does. This makes parent/student roles effectively read-all-in-school. Fix is a small helper (e.g. _apply_role_scope(query, user, entity)) invoked consistently.",
+    "routes_extras.diary_list uses parent lookup via db.students.find({'parent_id': user['id']}) — correct. Reuse the same lookup pattern in list_students / list_fee_invoices to return only rows where student.parent_id == user['id'] or student.user_id == user['id'].",
+    "Diary DiaryIn.model is reused for PUT — this means every field (including class_id, date) is required on update. Consider a Partial model to allow patching just homework/notes.",
+    "In routes_extras.result_card the passed check for each subject uses `passing_marks/total_marks*m.total` — if a subject stores its own total, the passing threshold is proportional; that's fine but should be documented, and integer rounding on borderline students could flip pass/fail; consider ceil() or explicit per-subject passing marks.",
+    "routes_extras.reminder_logs endpoint is accessible to any authenticated school user (require_school_active) — consider limiting to school_admin/accountant since it exposes parent phone numbers via the linked invoices.",
+    "routes_extras.due_soon does not paginate (limit 2000) and issues one users.find_one per invoice — for a large school this is N+1. Batch parent lookup with $in."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2.py (NEW — Phase 2A test suite, 23 tests)"
+  ],
+  "success_rate": {
+    "backend": "98% (51/52 — 29/29 baseline + 22/23 new; 1 failure is a real security bug, not a test issue)",
+    "frontend": "100% smoke (login/diary/reminders/change-password/voucher-print/result-card-print all render; role-based sidebar filtering verified for parent)"
+  },
+  "test_credentials": "Reused /app/memory/test_credentials.md as-is. Super, both school admins, teacher, parent, student all logged in successfully.",
+  "seed_data_creation": "Created TEST_-prefixed diary rows, one TEST_ChildOfParent student (only if parent had no existing child), TEST_Voucher_Fee, TEST_RC_Exam, TEST_ReminderInv, TEST_SendReminder and a handful of throwaway TEST_CHPW / TEST_PayFlow schools for isolated flows. No cleanup performed (safe — all TEST_-prefixed).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: `pytest backend/tests/backend_test.py backend/tests/test_phase2.py -v`. Only current failing test is TestParentStudentScoping::test_parent_students_only_own_children — will pass once role scoping is added to /api/school/students. After main agent applies role-scope helper to legacy endpoints, please extend test_phase2.py with parent-scoped checks for /fee-invoices, /results/{exam_id}, /attendance, /marks (student role too). Also worth adding a test that a parent cannot GET a student by id for a student not linked to them (currently the same 404-only-if-different-school check probably lets it through).",
+  "rca of the issue": "list_students in /app/backend/routes_school.py:176 builds `query = {'school_id': sid(user)}` and returns db.students.find(query). There is no branch on user['role']. Parent users are only filtered by school, so they see every student in Green Valley. Same anti-pattern is likely repeated in other legacy list endpoints (fee-invoices, exams, marks, results, attendance). Fix: mirror the pattern already implemented in routes_extras.diary_list — for role=='parent', look up own children via db.students.find({'parent_id': user['id']}) and constrain the outer query to those student ids (or class_ids for class-scoped resources); for role=='student', constrain to their own student_id or class_id."
+}

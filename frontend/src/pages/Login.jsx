@@ -15,6 +15,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault(); setBusy(true);
@@ -58,13 +59,22 @@ export default function Login() {
             <Button data-testid="login-submit" type="submit" disabled={busy} className="w-full h-11 rounded-md">{busy ? "Signing in…" : t("login")}</Button>
           </form>
           <div className="mt-6 rounded-lg border border-border bg-secondary/40 p-4 text-xs">
-            <div className="font-medium mb-2">Demo accounts</div>
-            <div className="grid gap-1.5">
-              <button data-testid="fill-super" onClick={()=>quick("zeeshan.ali98558@gmail.com","ZeeshanAdmin@2026")} className="text-start hover:text-primary">Super Admin → zeeshan.ali98558@gmail.com</button>
-              <button data-testid="fill-schoolA" onClick={()=>quick("admin@greenvalley.edu","School@123")} className="text-start hover:text-primary">School A Admin → admin@greenvalley.edu</button>
-              <button data-testid="fill-schoolB" onClick={()=>quick("admin@iqra.edu","School@123")} className="text-start hover:text-primary">School B Admin → admin@iqra.edu</button>
-              <button data-testid="fill-teacher" onClick={()=>quick("teacher@greenvalley.edu","Teacher@123")} className="text-start hover:text-primary">Teacher → teacher@greenvalley.edu</button>
-            </div>
+            <button type="button" onClick={()=>setShowDemo(!showDemo)} className="w-full text-start font-medium mb-2 flex items-center justify-between" data-testid="show-demo-toggle">
+              <span>Development demo accounts</span>
+              <span className="text-muted-foreground">{showDemo ? "Hide" : "Show"}</span>
+            </button>
+            {showDemo && (
+              <>
+              <div className="text-muted-foreground text-[11px] mb-2">These credentials are for development only. Rotate them before going to production.</div>
+              <div className="grid gap-1.5">
+                <button type="button" data-testid="fill-super" onClick={()=>quick("zeeshan.ali98558@gmail.com","ZeeshanAdmin@2026")} className="text-start hover:text-primary">Super Admin → zeeshan.ali98558@gmail.com</button>
+                <button type="button" data-testid="fill-schoolA" onClick={()=>quick("admin@greenvalley.edu","School@123")} className="text-start hover:text-primary">School A Admin → admin@greenvalley.edu</button>
+                <button type="button" data-testid="fill-schoolB" onClick={()=>quick("admin@iqra.edu","School@123")} className="text-start hover:text-primary">School B Admin → admin@iqra.edu</button>
+                <button type="button" data-testid="fill-teacher" onClick={()=>quick("teacher@greenvalley.edu","Teacher@123")} className="text-start hover:text-primary">Teacher → teacher@greenvalley.edu</button>
+                <button type="button" data-testid="fill-parent" onClick={()=>quick("parent@greenvalley.edu","Parent@123")} className="text-start hover:text-primary">Parent → parent@greenvalley.edu</button>
+              </div>
+              </>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-6">
             New school? <Link className="text-primary hover:underline" to="/register">Start your 7-day free trial</Link>

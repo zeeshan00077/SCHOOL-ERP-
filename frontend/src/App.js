@@ -29,6 +29,11 @@ import Timetable from "@/pages/school/Timetable";
 import Notices from "@/pages/school/Notices";
 import Settings from "@/pages/school/Settings";
 import UsersPage from "@/pages/school/Users";
+import Diary from "@/pages/school/Diary";
+import Reminders from "@/pages/school/Reminders";
+import ChangePassword from "@/pages/school/ChangePassword";
+import FeeVoucher from "@/pages/school/FeeVoucher";
+import ResultCard from "@/pages/school/ResultCard";
 
 function Protected({ role, children }) {
   const { user, checking } = useAuth();
@@ -79,9 +84,16 @@ export default function App() {
                 <Route path="exams" element={<Exams />} />
                 <Route path="timetable" element={<Timetable />} />
                 <Route path="notices" element={<Notices />} />
+                <Route path="diary" element={<Diary />} />
+                <Route path="reminders" element={<Reminders />} />
+                <Route path="change-password" element={<ChangePassword />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
+
+              {/* Standalone print routes (no sidebar) */}
+              <Route path="/print/voucher/:invoiceId" element={<Protected role={["school_admin","teacher","accountant","parent","student"]}><FeeVoucher /></Protected>} />
+              <Route path="/print/result-card/:examId/:studentId" element={<Protected role={["school_admin","teacher","parent","student"]}><ResultCard /></Protected>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

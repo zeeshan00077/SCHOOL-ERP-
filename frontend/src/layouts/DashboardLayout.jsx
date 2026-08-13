@@ -8,7 +8,8 @@ import api from "@/lib/api";
 import {
   GraduationCap, LayoutDashboard, School, CreditCard, Wallet, ClipboardList,
   Users, UserCog, Users2, BookOpen, CalendarCheck, Receipt, GraduationCap as GradIcon,
-  CalendarClock, Megaphone, Cog, LogOut, Menu, Sun, Moon, Languages, ShieldCheck, UserPlus
+  CalendarClock, Megaphone, Cog, LogOut, Menu, Sun, Moon, Languages, ShieldCheck, UserPlus,
+  NotebookPen, MessageCircle, KeyRound
 } from "lucide-react";
 
 const superLinks = [
@@ -28,9 +29,12 @@ const schoolLinks = [
   { to: "/app/fees", icon: Receipt, key: "fees" },
   { to: "/app/exams", icon: ClipboardList, key: "exams" },
   { to: "/app/timetable", icon: CalendarClock, key: "timetable" },
+  { to: "/app/diary", icon: NotebookPen, key: "diary" },
   { to: "/app/notices", icon: Megaphone, key: "notices" },
+  { to: "/app/reminders", icon: MessageCircle, key: "reminders" },
   { to: "/app/users", icon: UserPlus, key: "users" },
   { to: "/app/settings", icon: Cog, key: "settings" },
+  { to: "/app/change-password", icon: KeyRound, key: "changePassword" },
 ];
 
 export default function DashboardLayout({ kind }) {
@@ -49,8 +53,15 @@ export default function DashboardLayout({ kind }) {
   }, [kind]);
 
   const isSchoolAdminOnly = user?.role === "school_admin";
+  const isTeacher = user?.role === "teacher";
   const filteredLinks = links.filter((l) => {
-    if (kind === "school" && !isSchoolAdminOnly && ["users","settings"].includes(l.key)) return false;
+    if (kind === "school" && !isSchoolAdminOnly) {
+      if (["users","settings","reminders"].includes(l.key)) return false;
+    }
+    // Parents/students see only relevant pages
+    if (kind === "school" && ["parent","student"].includes(user?.role)) {
+      return ["dashboard","diary","notices","fees","exams","timetable","changePassword"].includes(l.key);
+    }
     return true;
   });
 

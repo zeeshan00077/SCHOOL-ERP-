@@ -100,9 +100,11 @@ export default function Exams() {
               <div className="font-medium mb-2">Results</div>
               <div className="rounded-lg border border-border overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-secondary/60 text-xs uppercase"><tr><th className="text-start px-3 py-2">Pos</th><th className="text-start px-3 py-2">Student</th><th className="text-start px-3 py-2">Obt/Total</th><th className="text-start px-3 py-2">%</th><th className="text-start px-3 py-2">Grade</th></tr></thead>
+                  <thead className="bg-secondary/60 text-xs uppercase"><tr><th className="text-start px-3 py-2">Pos</th><th className="text-start px-3 py-2">Student</th><th className="text-start px-3 py-2">Obt/Total</th><th className="text-start px-3 py-2">%</th><th className="text-start px-3 py-2">Grade</th><th></th></tr></thead>
                   <tbody>{results.results.map(r=>(
-                    <tr key={r.student_id} className="border-t border-border"><td className="px-3 py-2">{r.position}</td><td className="px-3 py-2">{r.student_name}</td><td className="px-3 py-2">{r.obtained}/{r.total}</td><td className="px-3 py-2">{r.percentage}%</td><td className="px-3 py-2 font-medium">{r.grade}</td></tr>
+                    <tr key={r.student_id} className="border-t border-border"><td className="px-3 py-2">{r.position}</td><td className="px-3 py-2">{r.student_name}</td><td className="px-3 py-2">{r.obtained}/{r.total}</td><td className="px-3 py-2">{r.percentage}%</td><td className="px-3 py-2 font-medium">{r.grade}</td>
+                    <td className="px-3 py-2"><Button size="sm" variant="ghost" onClick={()=>window.open(`/print/result-card/${selExam.id}/${r.student_id}`, "_blank")} data-testid={`card-${r.student_id}`}>Print card</Button></td>
+                    </tr>
                   ))}</tbody>
                 </table>
               </div>
