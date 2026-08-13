@@ -1,0 +1,56 @@
+{
+  "summary": "Phase 2B full regression + new-feature testing. Added /app/backend/tests/test_phase2b.py with 37 targeted tests covering Student unique ID (STU-YYYY-NNNNN backfill, per-school counters, search-by-id), photo upload (multipart /uploads/photo, MIME + 3MB caps, path traversal, unauth 401), tenant isolation on serve (School A file 404 for School B; super_admin bypass; teacher-same-school allowed), student admission with new fields + receptionist allowed + teacher forbidden (403), student update + photo endpoint role gating + cross-tenant 404, landscape voucher.pdf (application/pdf + %PDF- header + cross-school 404), ID card preview payload + role gating, bulk ID-cards PDF by student_ids and by class_id (400 when neither, 404 when class belongs to another school, teacher allowed, parent/student forbidden), configurable id_card_back_text via /school/settings surfacing in ID card payload, and result-card auto photo_url. Baseline: 52/52 backend_test.py + test_phase2.py PASS (Phase 2A role-scoping fix from iter2 is now confirmed working — parent no longer sees other students on /api/school/students). Phase 2B: 37/37 PASS. Frontend smoke on Preview URL: Students list shows Photo circle + STU-2026-NNNNN column + search; /app/students/{id} StudentProfile renders with 'Change photo', View ID card, and Download ID card PDF; /print/id-card/{sid} shows Front + Back cards with configured back text persisted (TEST_BACK_55174b visible), Print + Download PDF buttons; /print/voucher/{invoiceId} shows 3 copies with Student/Parent/Bank labels + landscape @page CSS + Download PDF button; Settings shows 'ID card back text' textarea. Parent sidebar limited to Dashboard, Fees, Examinations, Timetable, Daily Diary, Notices, Change Password (correct). Developer branding preserved throughout. Total: 89/89 backend tests + 100% frontend smoke.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "routes_school.py::create_student", "issue": "Dead/unreachable code — after `return doc` at line 249 the same doc-insert block is repeated (lines 250-259). No functional impact but should be removed. Also `next_student_id` is imported inline inside the function body — move to top-level import."},
+      {"endpoint": "routes_uploads.py::upload_photo", "issue": "Depends on require_school_active but the review request states super_admin bypasses download only; upload correctly rejects super_admin (no school_id) via 400 — behaviour matches spec but could be more explicit."},
+      {"endpoint": "routes_phase2b.py::backfill_student_ids", "issue": "Counters index (`await get_db().counters.create_index('key', unique=True)`) is created AFTER backfill runs on startup — race between $inc/upsert and index creation is fine here because startup is serial, but the ordering is fragile. Consider creating index before backfill."},
+      {"endpoint": "routes_phase2b.py::next_student_id", "issue": "Uses `return_document=True` (truthy) which motor interprets as ReturnDocument.AFTER via the ReturnDocument import — motor accepts pymongo.ReturnDocument.AFTER constant; passing True works but non-canonical. Recommend `from pymongo import ReturnDocument; return_document=ReturnDocument.AFTER`."},
+      {"endpoint": "routes_phase2b.py::id_cards_pdf_endpoint 404 for cross-school class", "issue": "Cross-school class returns 404 only because no students matched (`if not students: raise 404`). If the other school happens to have zero students in that class-id — extremely unlikely — it would still 404 but for a different reason. Consider validating class ownership explicitly for clearer semantics."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ID card preview (/print/id-card/:sid)", "issues": ["Photo placeholder shows literal 'Photo' text inside a large square — fine for print but could be styled as an outline icon like the profile page's avatar circle for consistency."]},
+      {"screen": "Parent Dashboard", "issues": ["Parent role sees whole-school aggregate counts (Students 35, Teachers 1, Pending Fees 20800) on Dashboard — pre-existing from Phase 1, not a Phase 2B regression. Consider scoping parent dashboard to their own child(ren)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase2b.py",
+    "/app/backend/tests/test_phase2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter3_phase2b.xml",
+    "/app/test_reports/pytest/pytest_iter3_regression.xml"
+  ],
+  "action_items": [
+    "MINOR: Remove dead code block in routes_school.py::create_student (lines 250-259, unreachable after return).",
+    "MINOR: Move `from routes_phase2b import next_student_id` to top of routes_school.py (currently imported inside function).",
+    "MINOR: Create counters unique index BEFORE running backfill_student_ids() in server.py startup for safer ordering.",
+    "MINOR: Use pymongo.ReturnDocument.AFTER instead of `return_document=True` in next_student_id.",
+    "OPTIONAL (Phase 1 legacy, not Phase 2B): Scope parent dashboard aggregates to only own children."
+  ],
+  "critical_code_review_comments": [
+    "routes_school.create_student has an unreachable duplicated block after `return doc` (dead code) — indicates a merge artifact.",
+    "routes_school.list_students::query build order: `if q:` overrides any prior `$or` — fine because we build once, but if role scope also needed a $or we'd have conflicts. Current code path is safe because parent/student role uses `id: {$in:[...]}` restrictor plus name/roll/adm/student_id search.",
+    "routes_uploads.py path safety: server checks `if '/' in file_id or '..' in file_id`. FastAPI path param already forbids '/', so the '..' check is the effective guard. A rogue url-encoded traversal is decoded by Starlette before match, so ../ would still be caught. Test asserts 400/404 on '..evil'.",
+    "pdf_service.id_cards_pdf: photo is embedded as base64 data URI to avoid xhtml2pdf hitting local file paths — good; but for very large photos this inflates PDF size (~1.3× per photo). Consider Pillow-resize to 200×250 before base64 in _photo_data_uri.",
+    "routes_phase2b.voucher_pdf_download reuses routes_extras.fee_voucher() for the payload — good DRY. However that function checks role/tenant internally; the extra `require_school_active` on this endpoint is redundant but harmless.",
+    "Uploads collection has no index on file_id — every serve does a full-collection scan on file_id. Add `db.uploads.create_index('file_id', unique=True)`."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase2b.py (NEW — 37 Phase 2B tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (89/89 — 52 regression + 37 new)",
+    "frontend": "100% smoke (Students list w/ STU-YYYY column + photo + search; Student profile with Change photo/View ID card/Download PDF; /print/id-card front+back with configured back text; /print/voucher 3 landscape copies w/ Download PDF; Settings id_card_back_text; parent sidebar filtered correctly)"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md as-is — all six roles login OK.",
+  "seed_data_creation": "TEST_-prefixed rows only: students (TEST_UniqID_*, TEST_Search_*, TEST_IsoA_*, TEST_IsoB_*, TEST_Admission_Fields, TEST_RecepCreated, TEST_TeacherCreate, TEST_UpdateOrig/New, TEST_UpdCross, TEST_PhotoUpd, TEST_VoucherPDF, TEST_ICard, TEST_RCPhoto, TEST_OtherChild), one throwaway receptionist user (reception+<hex>@greenvalley.edu / Recep@123), a few TEST_ fee-invoices, one TEST_RCPhoto_Ex exam, TEST_S_ subjects, and uploaded photos under /app/backend/uploads/{schoolA_id}/. Also mutated School A's id_card_back_text to a TEST_BACK_<hex> value — main agent may want to reset it to a friendly default via Settings UI.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run `pytest backend/tests -v` (89 tests, ~25s). All Phase 2B endpoints are covered. If new features add photo-resize or PDF password-protection, extend test_phase2b.py::TestPhotoUpload and TestVoucherPDF respectively. Parent-scope aggregation on /school/dashboard is still school-wide (pre-existing) — flag if that becomes a Phase 3 requirement.",
+  "rca of the issue": "N/A — no critical bugs found in Phase 2B. Only minor code-quality items (dead code, non-canonical constant, index ordering) that do not affect functionality."
+}

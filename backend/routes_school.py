@@ -200,12 +200,18 @@ async def list_students(class_id: Optional[str] = None, q: Optional[str] = None,
     if class_id:
         query["class_id"] = class_id
     if q:
-        query["name"] = {"$regex": q, "$options": "i"}
+        query["$or"] = [
+            {"name": {"$regex": q, "$options": "i"}},
+            {"student_id": {"$regex": q, "$options": "i"}},
+            {"admission_number": {"$regex": q, "$options": "i"}},
+            {"father_name": {"$regex": q, "$options": "i"}},
+            {"roll_number": {"$regex": q, "$options": "i"}},
+        ]
     return await db.students.find(query, {"_id": 0}).sort("name", 1).to_list(5000)
 
 
 @router.post("/students")
-async def create_student(inp: StudentIn, user=Depends(require_role("school_admin"))):
+async def create_student(inp: StudentIn, user=Depends(require_role("school_admin", "receptionist"))):
     db = get_db()
     cls = await db.classes.find_one({"id": inp.class_id, "school_id": sid(user)})
     if not cls:
@@ -229,8 +235,11 @@ async def create_student(inp: StudentIn, user=Depends(require_role("school_admin
             await db.users.insert_one(parent_doc)
             parent_id = parent_doc["id"]
     admission = data.get("admission_number") or f"ADM-{int(now_utc().timestamp())}"
+    from routes_phase2b import next_student_id
+    student_uid = await next_student_id(db, sid(user))
     doc = {
         "id": new_id(), "school_id": sid(user), **data,
+        "student_id": student_uid,
         "admission_number": admission, "parent_id": parent_id,
         "status": "active", "created_at": iso(now_utc()),
     }

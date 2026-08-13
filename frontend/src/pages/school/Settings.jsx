@@ -22,6 +22,10 @@ export default function Settings() {
           <Label>Bank / payment instructions (printed on fee voucher)</Label>
           <Textarea rows={3} placeholder="e.g. Deposit at MCB Bank, Account #1234-5678, Branch Lahore..." value={s.bank_instructions || ""} onChange={(e)=>setS({...s, bank_instructions: e.target.value})} data-testid="set-bank"/>
         </div>
+        <div className="sm:col-span-2 space-y-2">
+          <Label>ID card back text (printed on student ID card)</Label>
+          <Textarea rows={3} placeholder="e.g. If found, please return to the school office. Ph: +92-300-XXXXXXX" value={s.id_card_back_text || ""} onChange={(e)=>setS({...s, id_card_back_text: e.target.value})} data-testid="set-idback"/>
+        </div>
         <div className="sm:col-span-2"><Button type="submit" data-testid="save-settings">Save</Button></div>
       </form>
       <p className="text-xs text-muted-foreground" data-testid="settings-branding">Developed by Zeeshan Computers Sheikh Fazal · 0343-0819382</p>

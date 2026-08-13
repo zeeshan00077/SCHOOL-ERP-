@@ -34,6 +34,8 @@ import Reminders from "@/pages/school/Reminders";
 import ChangePassword from "@/pages/school/ChangePassword";
 import FeeVoucher from "@/pages/school/FeeVoucher";
 import ResultCard from "@/pages/school/ResultCard";
+import StudentProfile from "@/pages/school/StudentProfile";
+import IdCardPreview from "@/pages/school/IdCardPreview";
 
 function Protected({ role, children }) {
   const { user, checking } = useAuth();
@@ -76,6 +78,7 @@ export default function App() {
               <Route path="/app" element={<Protected role={["school_admin","teacher","accountant","receptionist","librarian","parent","student"]}><DashboardLayout kind="school" /></Protected>}>
                 <Route index element={<SchoolDashboard />} />
                 <Route path="students" element={<Students />} />
+                <Route path="students/:id" element={<StudentProfile />} />
                 <Route path="teachers" element={<Teachers />} />
                 <Route path="parents" element={<Parents />} />
                 <Route path="classes" element={<Classes />} />
@@ -94,6 +97,7 @@ export default function App() {
               {/* Standalone print routes (no sidebar) */}
               <Route path="/print/voucher/:invoiceId" element={<Protected role={["school_admin","teacher","accountant","parent","student"]}><FeeVoucher /></Protected>} />
               <Route path="/print/result-card/:examId/:studentId" element={<Protected role={["school_admin","teacher","parent","student"]}><ResultCard /></Protected>} />
+              <Route path="/print/id-card/:studentId" element={<Protected role={["school_admin","teacher","receptionist","accountant","parent","student"]}><IdCardPreview /></Protected>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

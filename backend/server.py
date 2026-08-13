@@ -19,6 +19,8 @@ from seed import seed_all
 from routes_super import router as super_router
 from routes_school import router as school_router
 from routes_extras import router as extras_router
+from routes_uploads import router as uploads_router
+from routes_phase2b import router as phase2b_router, backfill_student_ids, next_student_id
 
 app = FastAPI(title="Skoolzoom School ERP SaaS")
 api = APIRouter(prefix="/api")
@@ -34,7 +36,10 @@ async def startup():
     await db.students.create_index([("school_id", 1), ("class_id", 1)])
     await db.attendance.create_index([("school_id", 1), ("date", 1)])
     await db.fee_invoices.create_index([("school_id", 1), ("student_id", 1)])
+    await get_db().counters.create_index("key", unique=True)
+    await get_db().uploads.create_index("file_id", unique=True)
     await seed_all()
+    await backfill_student_ids()
 
 
 # ---------------- Auth ----------------
@@ -216,6 +221,8 @@ app.include_router(api)
 app.include_router(super_router)
 app.include_router(school_router)
 app.include_router(extras_router)
+app.include_router(uploads_router)
+app.include_router(phase2b_router)
 
 app.add_middleware(
     CORSMiddleware,

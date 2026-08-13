@@ -30,6 +30,7 @@ class ResetIn(BaseModel):
 
 class SchoolUpdateIn(BaseModel):
     bank_instructions: Optional[str] = None
+    id_card_back_text: Optional[str] = None
     logo_url: Optional[str] = None
     address: Optional[str] = None
     phone: Optional[str] = None
@@ -94,6 +95,12 @@ class StudentIn(BaseModel):
     roll_number: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    cnic_bform: Optional[str] = None
+    admission_date: Optional[str] = None
+    academic_session: Optional[str] = None
+    previous_school: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    photo_url: Optional[str] = None
     parent_email: Optional[EmailStr] = None
     parent_name: Optional[str] = None
     parent_phone: Optional[str] = None
