@@ -34,8 +34,33 @@ import Reminders from "@/pages/school/Reminders";
 import ChangePassword from "@/pages/school/ChangePassword";
 import FeeVoucher from "@/pages/school/FeeVoucher";
 import ResultCard from "@/pages/school/ResultCard";
+import { useParams } from "react-router-dom";
+function ResultCardWithPdfBtn() {
+  const { examId, studentId } = useParams();
+  const dl = async () => {
+    const url = `${process.env.REACT_APP_BACKEND_URL}/api/school/results/${examId}/students/${studentId}/card.pdf`;
+    const res = await fetch(url, { credentials: "include", headers: { Authorization: `Bearer ${localStorage.getItem("sz_access_token") || ""}` } });
+    const blob = await res.blob();
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = u; a.download = `result-${studentId}.pdf`; a.click();
+  };
+  return (
+    <div>
+      <div className="max-w-3xl mx-auto px-4 pt-6 print:hidden flex justify-end">
+        <button onClick={dl} className="text-sm underline text-primary" data-testid="dl-result-pdf">Download PDF</button>
+      </div>
+      <ResultCard />
+    </div>
+  );
+}
 import StudentProfile from "@/pages/school/StudentProfile";
 import IdCardPreview from "@/pages/school/IdCardPreview";
+import Expenses from "@/pages/school/Expenses";
+import Payroll from "@/pages/school/Payroll";
+import Reports from "@/pages/school/Reports";
+import Admissions from "@/pages/school/Admissions";
+import PublicEnquiry from "@/pages/PublicEnquiry";
+import SystemSettings from "@/pages/super/SystemSettings";
 
 function Protected({ role, children }) {
   const { user, checking } = useAuth();
@@ -60,6 +85,7 @@ export default function App() {
             <Toaster position="top-right" richColors />
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/apply" element={<PublicEnquiry />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/home" element={<RoleHome />} />
@@ -72,6 +98,7 @@ export default function App() {
                 <Route path="plans" element={<Plans />} />
                 <Route path="payments" element={<SuperPayments />} />
                 <Route path="audit" element={<AuditLogs />} />
+                <Route path="system-settings" element={<SystemSettings />} />
               </Route>
 
               {/* School */}
@@ -89,6 +116,10 @@ export default function App() {
                 <Route path="notices" element={<Notices />} />
                 <Route path="diary" element={<Diary />} />
                 <Route path="reminders" element={<Reminders />} />
+                <Route path="expenses" element={<Expenses />} />
+                <Route path="payroll" element={<Payroll />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="admissions" element={<Admissions />} />
                 <Route path="change-password" element={<ChangePassword />} />
                 <Route path="users" element={<UsersPage />} />
                 <Route path="settings" element={<Settings />} />
@@ -96,7 +127,7 @@ export default function App() {
 
               {/* Standalone print routes (no sidebar) */}
               <Route path="/print/voucher/:invoiceId" element={<Protected role={["school_admin","teacher","accountant","parent","student"]}><FeeVoucher /></Protected>} />
-              <Route path="/print/result-card/:examId/:studentId" element={<Protected role={["school_admin","teacher","parent","student"]}><ResultCard /></Protected>} />
+              <Route path="/print/result-card/:examId/:studentId" element={<Protected role={["school_admin","teacher","parent","student"]}><ResultCardWithPdfBtn /></Protected>} />
               <Route path="/print/id-card/:studentId" element={<Protected role={["school_admin","teacher","receptionist","accountant","parent","student"]}><IdCardPreview /></Protected>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />

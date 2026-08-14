@@ -21,6 +21,7 @@ from routes_school import router as school_router
 from routes_extras import router as extras_router
 from routes_uploads import router as uploads_router
 from routes_phase2b import router as phase2b_router, backfill_student_ids, next_student_id
+from routes_phase3 import router as phase3_router
 
 app = FastAPI(title="Skoolzoom School ERP SaaS")
 api = APIRouter(prefix="/api")
@@ -223,6 +224,7 @@ app.include_router(school_router)
 app.include_router(extras_router)
 app.include_router(uploads_router)
 app.include_router(phase2b_router)
+app.include_router(phase3_router)
 
 app.add_middleware(
     CORSMiddleware,

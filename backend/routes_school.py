@@ -83,6 +83,33 @@ async def submit_payment(inp: PaymentSubmitIn, user=Depends(require_role("school
 async def dashboard(user=Depends(require_school_active)):
     db = get_db()
     s_id = sid(user)
+    # ---- Parent dashboard: scope to own children ----
+    if user["role"] == "parent":
+        children = await db.students.find({"school_id": s_id, "parent_id": user["id"]}, {"_id": 0}).to_list(20)
+        child_ids = [c["id"] for c in children]
+        class_ids = list({c["class_id"] for c in children if c.get("class_id")})
+        today = now_utc().date().isoformat()
+        att = await db.attendance.find({"school_id": s_id, "date": today, "student_id": {"$in": child_ids}}, {"_id": 0}).to_list(100)
+        present = sum(1 for a in att if a["status"] == "present")
+        absent = sum(1 for a in att if a["status"] == "absent")
+        invoices = await db.fee_invoices.find({"school_id": s_id, "student_id": {"$in": child_ids}}, {"_id": 0}).to_list(500)
+        pending_fees = sum((i["amount"] - i.get("paid_amount", 0)) for i in invoices if i.get("status") != "paid")
+        notices = await db.notices.find({"school_id": s_id, "$or": [{"audience": "all"}, {"audience": "parents"}, {"class_id": {"$in": class_ids}}]}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
+        trend = []
+        for i in range(6, -1, -1):
+            d = (now_utc() - timedelta(days=i)).date().isoformat()
+            day_att = await db.attendance.find({"school_id": s_id, "date": d, "student_id": {"$in": child_ids}}, {"_id": 0}).to_list(100)
+            p = sum(1 for a in day_att if a["status"] == "present")
+            trend.append({"date": d, "present": p, "total": len(day_att)})
+        return {
+            "role_scope": "parent",
+            "children": children,
+            "total_students": len(children),
+            "total_teachers": 0, "total_parents": 0,
+            "present_today": present, "absent_today": absent,
+            "fee_collection_today": 0, "pending_fees": pending_fees,
+            "notices": notices, "attendance_trend": trend, "fee_series": [],
+        }
     total_students = await db.students.count_documents({"school_id": s_id})
     total_teachers = await db.teachers.count_documents({"school_id": s_id})
     total_parents = await db.users.count_documents({"school_id": s_id, "role": "parent"})

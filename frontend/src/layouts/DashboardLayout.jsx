@@ -9,7 +9,7 @@ import {
   GraduationCap, LayoutDashboard, School, CreditCard, Wallet, ClipboardList,
   Users, UserCog, Users2, BookOpen, CalendarCheck, Receipt, GraduationCap as GradIcon,
   CalendarClock, Megaphone, Cog, LogOut, Menu, Sun, Moon, Languages, ShieldCheck, UserPlus,
-  NotebookPen, MessageCircle, KeyRound
+  NotebookPen, MessageCircle, KeyRound, Coins, Landmark, BarChart3, UserPlus2, ShieldCheck as ShieldIcon
 } from "lucide-react";
 
 const superLinks = [
@@ -18,19 +18,24 @@ const superLinks = [
   { to: "/super-admin/plans", icon: CreditCard, key: "plans" },
   { to: "/super-admin/payments", icon: Wallet, key: "payments" },
   { to: "/super-admin/audit", icon: ClipboardList, key: "audit" },
+  { to: "/super-admin/system-settings", icon: ShieldIcon, key: "systemSettings" },
 ];
 const schoolLinks = [
   { to: "/app", end: true, icon: LayoutDashboard, key: "dashboard" },
+  { to: "/app/admissions", icon: UserPlus2, key: "admissions" },
   { to: "/app/students", icon: Users, key: "students" },
   { to: "/app/teachers", icon: GradIcon, key: "teachers" },
   { to: "/app/parents", icon: Users2, key: "parents" },
   { to: "/app/classes", icon: BookOpen, key: "classes" },
   { to: "/app/attendance", icon: CalendarCheck, key: "attendance" },
   { to: "/app/fees", icon: Receipt, key: "fees" },
+  { to: "/app/expenses", icon: Coins, key: "expenses" },
+  { to: "/app/payroll", icon: Landmark, key: "payroll" },
   { to: "/app/exams", icon: ClipboardList, key: "exams" },
   { to: "/app/timetable", icon: CalendarClock, key: "timetable" },
   { to: "/app/diary", icon: NotebookPen, key: "diary" },
   { to: "/app/notices", icon: Megaphone, key: "notices" },
+  { to: "/app/reports", icon: BarChart3, key: "reports" },
   { to: "/app/reminders", icon: MessageCircle, key: "reminders" },
   { to: "/app/users", icon: UserPlus, key: "users" },
   { to: "/app/settings", icon: Cog, key: "settings" },
@@ -56,7 +61,9 @@ export default function DashboardLayout({ kind }) {
   const isTeacher = user?.role === "teacher";
   const filteredLinks = links.filter((l) => {
     if (kind === "school" && !isSchoolAdminOnly) {
-      if (["users","settings","reminders"].includes(l.key)) return false;
+      if (["users","settings","reminders","expenses","payroll","admissions","reports"].includes(l.key)) {
+        if (!(l.key === "admissions" && user?.role === "receptionist") && !(["expenses","payroll","reports"].includes(l.key) && user?.role === "accountant")) return false;
+      }
     }
     // Parents/students see only relevant pages
     if (kind === "school" && ["parent","student"].includes(user?.role)) {

@@ -1,0 +1,57 @@
+{
+  "summary": "Phase 3 full backend + frontend smoke. Added /app/backend/tests/test_phase3.py with 35 tests covering: system-settings RBAC (super_admin only, school_admin/teacher 403, /api/public/system-branding unauth GET OK), parent dashboard scoping (role_scope='parent', total_students<=children, total_teachers=0, total_parents=0), school_admin dashboard remains school-wide (no role_scope), expenses (admin/accountant create, teacher 403, parent 403, list filters status/date/category, cross-tenant invisible + approve 404, approve creates ledger debit of expense amount, double-approve 400), accounts create/list, ledger tenant isolation, payroll (set salary + cross-tenant 404, process computes net = basic + allowances - deductions, pay creates ledger salary debit, salary slip PDF returns application/pdf %PDF-, cross-tenant slip 404, double-pay 400), reports summary keys + teacher 403 + students.csv + fee-collection.csv, admissions (public schools list, public POST enquiry returns ENQ-YYYY-NNNN, invalid school_id 404, teacher list 403, tenant scoped, convert creates STU- student, double convert 400, cross-tenant convert 404), result card PDF %PDF- + cross-tenant 404/403. Full regression: 124/124 backend tests pass (89 baseline + 35 new). Frontend smoke: /apply loads unauth with schools dropdown + full form; super sidebar has 'System Settings' (route /super-admin/system-settings works); school admin sees Admissions + Expenses + Payroll + Reports; teacher hides Expenses/Payroll/Admissions BUT still shows 'Reports' item (nav filter bug — backend correctly 403s so no data leak); parent sidebar limited to Dashboard/Fees/Examinations/Timetable/Diary/Notices/Change Password; parent dashboard renders STUDENTS=1, TEACHERS=0, PARENTS=0, PENDING FEES=23,200 (own-child scope), developer branding footer preserved.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/admission-enquiries", "issue": "Enquiry sequence uses TWO find_one_and_update calls (lines 557-567 in routes_phase3.py): first with $inc:1 return_document=True (truthy = ReturnDocument.AFTER via pymongo constant), then a redundant second call with $inc:0 to re-read the same counter. The second call is dead-weight — the first already returns the incremented doc. Also `return_document=True` is non-canonical; prefer `from pymongo import ReturnDocument; return_document=ReturnDocument.AFTER`. Functional impact: none (counter still advances by 1 per submission), just a redundant round-trip."},
+      {"endpoint": "POST /api/public/admission-enquiries", "issue": "No rate limiting / anti-abuse on the public unauthenticated endpoint. Basic input validation via Pydantic is present, but no CAPTCHA, per-IP throttle, or duplicate suppression. Consider adding a simple in-memory (or Redis) rate limit and/or honeypot field before production launch — flagged as future work, not a regression."},
+      {"endpoint": "GET /api/school/ledger", "issue": "Fee payments do NOT auto-write a ledger credit entry — only approved expenses (debit) and paid salaries (debit) are written. Flagged in the review request as 'Phase 3 forward work, not a failure' so not counted as a bug; simply confirmed."},
+      {"endpoint": "POST /api/school/payroll/process", "issue": "When a payroll_run for the same (school, month) already exists in 'processed' state, the endpoint returns the existing run_id with `already: true` and does NOT re-compute entries — so any teacher whose salary changed after initial processing won't reflect. This is documented behaviour (idempotent) but could catch users off-guard. Consider a `?force=true` flag to re-process."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "layouts/DashboardLayout.jsx sidebar filter", "issue": "Teacher role sees 'Reports' link in sidebar. Line 64 filter list `['users','settings','reminders','expenses','payroll','admissions']` does NOT include 'reports', so it falls through to `return true` for teacher. Backend correctly returns 403 on /api/school/reports/summary so no data leaks, but UI misleads teacher. Fix: add 'reports' to the excluded-for-non-admin list and keep the accountant exception (line 65 already includes 'reports' in the accountant carve-out).", "selector": "nav aside a[href='/app/reports']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/app (parent dashboard)", "issues": ["Fee collection (last 6 months) chart card is empty (no bars) for parent view — probably backend returns empty series for parent scope. Minor: hide the card entirely for parents or show 'No data' placeholder instead of a blank chart pane."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase3.py",
+    "/app/backend/tests/test_phase2b.py",
+    "/app/backend/tests/test_phase2.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_iter4_phase3.xml",
+    "/app/test_reports/pytest/pytest_iter4_regression.xml"
+  ],
+  "action_items": [
+    "MEDIUM (frontend): Add 'reports' to the non-admin-hidden list in DashboardLayout.jsx line 64 so teachers do not see the Reports nav item. Accountant carve-out on line 65 already handles that role correctly.",
+    "MINOR (backend): Remove the redundant second find_one_and_update in routes_phase3.submit_enquiry (lines 562-567). Replace `return_document=True` with `pymongo.ReturnDocument.AFTER` for readability.",
+    "MINOR (backend): Consider adding rate limiting to /api/public/admission-enquiries before production (per-IP throttle or CAPTCHA).",
+    "PHASE-3-FORWARD (backend): Fee payments should also write ledger credit entries so /reports/summary and /school/ledger are self-consistent.",
+    "OPTIONAL (frontend): Empty fee-collection chart on parent dashboard should render an empty-state message rather than a blank card."
+  ],
+  "critical_code_review_comments": [
+    "routes_phase3.submit_enquiry has a double find_one_and_update against the counter — the second call is functionally a no-op re-read and adds latency. Should be a single upsert+increment with ReturnDocument.AFTER.",
+    "routes_phase3.process_payroll silently returns existing run without recomputation. Explicit 'already processed' semantics vs. re-run needs a design decision — currently silent idempotency could mask salary edits.",
+    "routes_phase3.reports_summary loops in Python over payments/expenses/invoices — for large tenants (>20k invoices) this is O(N) memory. Consider MongoDB aggregation `$group` for fee_by_method / expenses_by_category / outstanding to scale.",
+    "routes_phase3.salary_slip_pdf and result_card_pdf both inject school + user data into an HTML f-string without any HTML escaping (e.g., school.name, entry.employee_name). A hostile school name containing `</style><script>` would break the PDF and could inject content. xhtml2pdf sanitises most script tags but HTML-escape all user-provided values before interpolation.",
+    "routes_phase3.public_schools_list returns ALL active schools without pagination — fine for MVP with ~2 tenants, but should paginate for scale.",
+    "DashboardLayout.jsx sidebar filter has intertwined role logic (line 62-73). Refactor to a per-role allowlist map for clarity: e.g., ROLE_LINKS = { teacher: [...], accountant: [...] }."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase3.py (NEW — 35 Phase 3 tests)"
+  ],
+  "success_rate": {
+    "backend": "100% (124/124 = 89 baseline + 35 new Phase 3)",
+    "frontend": "95% smoke — all sidebars filter correctly except teacher still sees Reports (backend RBAC still enforces 403); parent dashboard scoping visually confirmed; /apply public page loads unauth with schools dropdown"
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md as-is. No accountant/receptionist seeded — those role gates verified by backend logic + code review only, not by frontend visual smoke.",
+  "seed_data_creation": "TEST_ prefixed rows only: expenses (TEST_exp_*), accounts (TEST_acct_*), admission_enquiries (TEST_Enq_*, TEST_ScopedEnq, TEST_ConvertMe_*, TEST_XConvert), one converted student STU-2026-NNNNN, one payroll_run for month 2099-MM to avoid interference with baseline months, salary set on School A's demo teacher (basic 40000, allow 7000, deduct 1000, net 46000). system_settings.footer_note is temporarily written then restored to original.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend fully green: run `cd /app/backend && pytest tests/ -v` (124 tests, ~36s). Only remaining frontend nudge: hide Reports nav item for teacher role in DashboardLayout.jsx. Phase 3 collections created: system_settings, expenses, accounts, ledger, payroll_runs, admission_enquiries. Public unauth endpoints: /api/public/system-branding, /api/public/schools, POST /api/public/admission-enquiries. Cross-tenant enforced on every /school/* Phase 3 route (verified). PDFs (salary slip, result card) return %PDF- and are cross-tenant 404-protected. Fee-payments-do-not-write-ledger is a known Phase 3 forward-work item.",
+  "rca of the issue": "Teacher-sees-Reports: the sidebar filter in DashboardLayout.jsx line 64 lists which nav keys should be hidden for non-school-admins, but 'reports' was omitted from that list. Adding 'reports' to the outer excluded set (while the existing line 65 already carves out accountant to still see reports/expenses/payroll) fixes the leak. Backend is not affected — /api/school/reports/summary already returns 403 for teacher."
+}
