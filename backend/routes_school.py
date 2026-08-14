@@ -1,6 +1,7 @@
 """School-scoped routes — enforced tenant isolation via user['school_id']."""
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
+from pydantic import BaseModel
 from datetime import datetime, timedelta
 from db import (get_db, require_role, require_school_active, get_current_user,
                 now_utc, iso, new_id, audit, hash_password, compute_school_status)
@@ -449,16 +450,61 @@ async def pay_create(inp: FeePaymentIn, user=Depends(require_role("school_admin"
     new_paid = inv.get("paid_amount", 0) + inp.amount
     status = "paid" if new_paid >= inv["amount"] else "partial"
     receipt_no = f"RC-{int(now_utc().timestamp())}"
-    doc = {"id": new_id(), "school_id": sid(user), "invoice_id": inp.invoice_id,
+    payment_id = new_id()
+    doc = {"id": payment_id, "school_id": sid(user), "invoice_id": inp.invoice_id,
            "student_id": inv["student_id"], "amount": inp.amount, "method": inp.method,
            "reference": inp.reference, "paid_on": inp.paid_on or now_utc().date().isoformat(),
            "received_by": user["id"], "receipt_no": receipt_no, "created_at": iso(now_utc())}
     await db.fee_payments.insert_one(doc)
     await db.fee_invoices.update_one({"id": inp.invoice_id}, {"$set": {
         "paid_amount": new_paid, "status": status}})
+    # Auto-post ledger CREDIT (idempotent via unique ref_id = payment_id)
+    existing = await db.ledger.find_one({"school_id": sid(user), "ref_type": "fee_payment", "ref_id": payment_id})
+    if not existing:
+        await db.ledger.insert_one({
+            "id": new_id(), "school_id": sid(user), "kind": "credit",
+            "amount": inp.amount, "account_id": None,
+            "description": f"Fee payment · Receipt {receipt_no} · {inv.get('student_name','')} · {inv.get('title','')}",
+            "ref_type": "fee_payment", "ref_id": payment_id,
+            "actor_id": user["id"], "created_at": iso(now_utc()),
+        })
     await audit(db, actor=user, action="record_payment", module="fees", record_id=doc["id"], after={"amount": inp.amount})
     doc.pop("_id", None)
     return doc
+
+
+class RefundIn(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.post("/fee-payments/{pid}/refund")
+async def pay_refund(pid: str, inp: RefundIn, user=Depends(require_role("school_admin", "accountant"))):
+    db = get_db()
+    p = await db.fee_payments.find_one({"id": pid, "school_id": sid(user)})
+    if not p:
+        raise HTTPException(404, "Not found")
+    if p.get("refunded"):
+        raise HTTPException(400, "Already refunded")
+    await db.fee_payments.update_one({"id": pid}, {"$set": {
+        "refunded": True, "refund_reason": inp.reason, "refunded_at": iso(now_utc()), "refunded_by": user["id"]}})
+    # Reverse invoice paid amount
+    inv = await db.fee_invoices.find_one({"id": p["invoice_id"], "school_id": sid(user)})
+    if inv:
+        new_paid = max(0, inv.get("paid_amount", 0) - p["amount"])
+        new_status = "paid" if new_paid >= inv["amount"] else ("partial" if new_paid > 0 else "unpaid")
+        await db.fee_invoices.update_one({"id": inv["id"]}, {"$set": {"paid_amount": new_paid, "status": new_status}})
+    # Ledger reversal (debit) — idempotent via unique ref_id
+    exist = await db.ledger.find_one({"school_id": sid(user), "ref_type": "fee_refund", "ref_id": pid})
+    if not exist:
+        await db.ledger.insert_one({
+            "id": new_id(), "school_id": sid(user), "kind": "debit",
+            "amount": p["amount"], "account_id": None,
+            "description": f"Fee refund · Receipt {p.get('receipt_no','')} · {inp.reason or ''}",
+            "ref_type": "fee_refund", "ref_id": pid,
+            "actor_id": user["id"], "created_at": iso(now_utc()),
+        })
+    await audit(db, actor=user, action="refund_payment", module="fees", record_id=pid, after={"reason": inp.reason})
+    return {"ok": True}
 
 
 @router.get("/fee-payments")

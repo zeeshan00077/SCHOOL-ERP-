@@ -74,7 +74,11 @@ export default function Reports() {
         <div className="font-medium mb-3">Exports (CSV)</div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={()=>dl(`/school/reports/students.csv`, "students.csv")} data-testid="csv-students"><FileText className="h-4 w-4 me-2"/>Students CSV</Button>
+          <Button variant="outline" onClick={()=>dl(`/school/reports/students.xlsx`, "students.xlsx")} data-testid="xlsx-students"><Download className="h-4 w-4 me-2"/>Students XLSX</Button>
           <Button variant="outline" onClick={()=>dl(`/school/reports/fee-collection.csv?date_from=${range.date_from}&date_to=${range.date_to}`, "fee-collection.csv")} data-testid="csv-fee"><Download className="h-4 w-4 me-2"/>Fee collection CSV</Button>
+          <Button variant="outline" onClick={()=>dl(`/school/reports/fee-collection.xlsx?date_from=${range.date_from}&date_to=${range.date_to}`, "fee-collection.xlsx")} data-testid="xlsx-fee"><Download className="h-4 w-4 me-2"/>Fee collection XLSX</Button>
+          <Button variant="outline" onClick={()=>dl(`/school/reports/expenses.xlsx?date_from=${range.date_from}&date_to=${range.date_to}`, "expenses.xlsx")} data-testid="xlsx-exp"><Download className="h-4 w-4 me-2"/>Expenses XLSX</Button>
+          <Button variant="outline" onClick={()=>dl(`/school/reports/ledger.xlsx?date_from=${range.date_from}&date_to=${range.date_to}`, "ledger.xlsx")} data-testid="xlsx-ledger"><Download className="h-4 w-4 me-2"/>Ledger XLSX</Button>
         </div>
       </div>
     </div>

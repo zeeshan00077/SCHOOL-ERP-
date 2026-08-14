@@ -1,48 +1,28 @@
 # Skoolzoom — Multi-Tenant School ERP SaaS (PRD)
 
 ## Problem statement
-Production-ready multi-tenant SaaS ERP for schools (Pakistan-first) with full trial/subscription lifecycle, tenant isolation, RBAC, secure uploads, real PDF generation, financial workflows and admissions pipeline. Developer branding: "Developed by Zeeshan Computers Sheikh Fazal · 0343-0819382".
+Production-ready multi-tenant SaaS ERP for schools (Pakistan-first) with full trial/subscription lifecycle, tenant isolation, RBAC + granular custom roles, secure uploads, real PDF & XLSX generation, financial workflows with ledger, admissions pipeline, and official WhatsApp Business Cloud API integration. Developer branding: "Developed by Zeeshan Computers Sheikh Fazal · 0343-0819382".
 
 ## Architecture
-FastAPI + Motor MongoDB · uuid string ids · React 19 + Router 7 + Tailwind + shadcn/ui + Recharts · xhtml2pdf (pisa) for PDFs · local file uploads at /app/backend/uploads/{school_id}/ · JWT (cookies + Bearer, bcrypt) · every /api/school/* enforces school_id server-side · role scoping for parent/student on every listable resource · audit logs on every mutation · brute-force lockout by email + X-Forwarded-For.
+FastAPI + Motor MongoDB · uuid string ids · React 19 + Router 7 + Tailwind + shadcn/ui + Recharts · xhtml2pdf for PDFs · openpyxl for XLSX · httpx for WhatsApp Cloud API · JWT (cookies + Bearer, bcrypt) · every /api/school/* enforces school_id server-side · audit logs · brute-force lockout · unique index on ledger(school_id, ref_type, ref_id) enforces idempotency at DB level.
 
-## Phase 1 (2026-02-13) — SHIPPED
-Landing, school registration (7d trial), auth (login/logout/register/refresh/forgot/reset + lockout), Super Admin console, School ERP (students/teachers/parents/classes/attendance/fees/exams/timetable/notices/users/settings), Subscription manual payment, EN/UR RTL, light/dark.
+## Phase 1–3 — SHIPPED
+Full auth + tenants, super admin console, ERP CRUD, subscription + manual payment, EN/UR RTL, light/dark, Daily Diary, ID Cards front+back + bulk PDF, A4 landscape 3-copy Fee Voucher PDF, Result Card PDF, unique Student IDs, secure photo upload, Expenses + approval + ledger, Payroll + salary slip PDF, Cash/Bank accounts + Ledger, Reports summary + CSV, Admissions (public /apply → convert), system settings super-admin-only, parent dashboard scoping. 124/124 tests.
 
-## Phase 2A — SHIPPED
-Daily Diary, Fee Voucher print, Result Card print, WhatsApp Reminders architecture (never fake-sends), Change Password, hidden demo credentials, legacy role scoping fixes.
+## Phase 4 (2026-02-13) — SHIPPED
+- **Custom Role Builder** — permissions catalog (14 modules × up to 7 actions); CRUD /api/school/custom-roles; server-side sanitization strips unknown modules/actions and platform-level escalation attempts; cross-tenant enforcement; assign PUT /users/{uid}/custom-role rejects role from another school
+- **Fee → Ledger auto-post** — pay_create writes ledger CREDIT idempotently; refund endpoint writes DEBIT reversal + reverses invoice paid_amount; unique DB index (school_id, ref_type, ref_id) enforces hard idempotency
+- **Real WhatsApp Business Cloud API** — POST /reminders/send-now calls Graph API via httpx when WHATSAPP_ACCESS_TOKEN + WHATSAPP_PHONE_NUMBER_ID env vars set; when unset, returns integration_configured=false and NEVER falsely claims sent; reminder_logs store queued/sending/sent/delivered/read/failed with provider_message_id; POST /webhooks/whatsapp/status updates delivery state
+- **XLSX exports** — openpyxl-generated Students/Fee Collection/Expenses/Payroll/Ledger .xlsx with branded header rows, column widths, totals rows; CSV exports untouched
+- **Tests** — 144/144 pass (124 baseline + 20 Phase 4)
 
-## Phase 2B — SHIPPED
-Unique Student ID (STU-YYYY-NNNNN per-school), secure photo upload, extended student fields, Student Profile, ID Card generator (front+back HTML + bulk PDF), configurable id_card_back_text, result card auto-photo, **A4 landscape 3-copy Fee Voucher** with real PDF, reusable pdf_service, receptionist role.
+## Production hardening remaining
+- WhatsApp webhook needs X-Hub-Signature-256 HMAC verification (needs WHATSAPP_APP_SECRET env)
+- Retry with exponential backoff for WhatsApp 429/5xx
+- Rotate all seeded demo passwords before go-live
+- Move file uploads to Emergent object storage
+- Rate-limit public /api/public/admission-enquiries
+- HTML-escape user-provided strings before xhtml2pdf interpolation
 
-## Phase 3 (2026-02-13) — SHIPPED
-- **System settings separation** — /api/system-settings super_admin-only; school admin cannot modify developer branding. /api/public/system-branding read-only surface.
-- **Parent dashboard scoping** — role_scope='parent' returns children-only counts / attendance / pending_fees / notices.
-- **Expense management** — CRUD + pending/approved/rejected + category filter + date range; approval creates ledger debit.
-- **Payroll** — per-employee basic + allowances[] + deductions[]; monthly `process` computes net; `pay` marks paid + ledger; salary slip PDF via xhtml2pdf.
-- **Accounts + Ledger** — cash/bank accounts, ledger entries for expenses and salaries.
-- **Reports module** — summary (income/expenses/net/outstanding/method-split/category-split), students.csv, fee-collection.csv, presets (today/week/month/prev/year/custom).
-- **Admissions** — public /api/public/admission-enquiries (no auth) creates ENQ-YYYY-NNNN, school admin/receptionist list/update/approve/reject, convert generates a real student with STU-YYYY-NNNNN and marks enquiry converted.
-- **Result Card PDF** — /api/school/results/{exam_id}/students/{student_id}/card.pdf via reusable pdf_service.
-- **Predefined roles expanded** — school_admin, teacher, accountant, receptionist, librarian, parent, student.
-- **Public route** — /apply (unauthenticated admission enquiry form).
-- **Tests** — 124/124 pass (89 baseline + 35 new).
-
-## Phase 3 known-limitations / forward-work
-- Fee payments do not yet auto-write ledger credit entries (only expenses/salaries write ledger)
-- Payroll `process` is idempotent per month — no `?force=true` to re-compute after salary edits yet
-- Public /api/public/admission-enquiries has Pydantic validation but no rate limit/CAPTCHA
-- User-provided strings (school name, employee name) not HTML-escaped before xhtml2pdf interpolation — xhtml2pdf sanitises most, but harden later
-- No fully-configurable custom-role builder UI yet (predefined roles only)
-- Parent dashboard fee-collection chart shows empty pane instead of empty-state (cosmetic)
-
-## Backlog (Phase 4+)
-- Custom role builder + granular per-permission editor UI
-- Full LMS, POS, Inventory, Library, Transport
-- Real WhatsApp Business API delivery
-- Move file storage to Emergent object storage
-- Excel export (openpyxl) alongside CSV
-- Pillow-resize photos before PDF embed
-- More reports: attendance percentage, defaulter list PDF, payroll expense report, ledger P&L
-- SMS/Email integrations, Stripe/Razorpay online payments
-- PWA/mobile shell, biometric attendance, AI features
+## Remaining ERP modules from original scope
+Front Desk (visitors/calls/appointments), full Admissions workflow (documents, admission fee), Syllabus tracking, PTM scheduling, Complaints/Tickets, Tasks, Download Center, POS (school store/uniform), Inventory, Library (books/issue/return/fine), Transport (routes/vehicles/drivers), full HR (leaves/departments/documents), Certificates generator, Attendance %/late report, Defaulter list PDF, Payroll expense report, Online payment gateway (Stripe/JazzCash), Biometric attendance, LMS (courses/lessons/quizzes), PWA/mobile shell, AI features.

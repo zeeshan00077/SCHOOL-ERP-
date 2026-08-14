@@ -1,0 +1,51 @@
+{
+  "summary": "Phase 4 full backend + frontend smoke. Added /app/backend/tests/test_phase4.py with 20 tests (1 skipped when School B has no invoices) covering: permissions catalog + /me for all roles, custom-roles CRUD with server-side sanitization of unknown modules/actions/escalation attempts (super_admin, unknown_module, wipe, hack_action all stripped), cross-tenant role isolation (School B cannot UPDATE, DELETE nor ASSIGN School A's role — assign returns 404; update returns 404; delete is a silent no-op but role remains in A's list, verified), delete-when-assigned returns 400, teacher 403 on /custom-roles list. Fee→Ledger auto-post creates exactly ONE credit entry per payment (ref_type=fee_payment, ref_id=payment.id, amount match, kind=credit); two distinct payments create two ledger rows; refund creates ONE debit (ref_type=fee_refund, ref_id=payment_id), reverses invoice paid_amount to 0, second refund returns 400 'Already refunded', cross-tenant refund → 404. WhatsApp unconfigured: env vars are unset in .env → send-now returns integration_configured=false, sent=0, queued>=1 (or 0 if no matching invoices in scope), integration_note present, no outbound HTTP; cross-tenant invoice_ids silently dropped (sent=queued=failed=0); webhook POST /api/webhooks/whatsapp/status returns 200. XLSX exports: students/fee-collection/expenses/ledger.xlsx all return 200 with Content-Type application/vnd.openxmlformats-officedocument.spreadsheetml.sheet and PK\\x03\\x04 magic bytes; payroll.xlsx?month=missing → 404; teacher role → 403. Accounting consistency: /reports/summary?date_from&date_to = 200. Full regression: 144 passed / 1 skipped in 44.87s (124 baseline + 20 new Phase 4). Frontend smoke: School A admin sees 'Custom Roles' sidebar link (below WhatsApp Reminders); /app/custom-roles renders permission matrix (14 modules × 6 action columns, 65 checkboxes counted in New Role dialog); 'Assign roles to users' section shows dropdown per user; Reports page shows Students CSV, Students XLSX, Fee collection CSV, Fee collection XLSX, Expenses XLSX, Ledger XLSX buttons — all data-testid present (xlsx-students, xlsx-fee, xlsx-exp, xlsx-ledger). Teacher role correctly does NOT see Custom Roles nav item (sidebar filter includes 'customRoles' in the non-admin excluded list).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "DELETE /api/school/custom-roles/{rid}", "issue": "Cross-tenant DELETE returns 200 {ok:true} instead of 404. `db.custom_roles.delete_one({\"id\": rid, \"school_id\": user.school_id})` filters properly (no data leak — School A's role survives, VERIFIED in test), but the endpoint silently no-ops when nothing matches. Should check `result.deleted_count == 0` → raise 404 for consistent semantics with PUT (which does 404). Not a security issue, just API contract inconsistency."},
+      {"endpoint": "POST /api/school/reminders/send-now", "issue": "Line 240-243 in routes_phase4.py has redundant branch: `log[\"status\"] = \"queued\" if not phone or inp.test_mode else \"queued\"` — both branches assign the same value. Simplify to `log[\"status\"] = \"queued\"`. Cosmetic only."},
+      {"endpoint": "POST /api/webhooks/whatsapp/status", "issue": "No signature verification / auth on the webhook. In production, Meta signs webhooks with X-Hub-Signature-256 (HMAC-SHA256 of body). Currently anyone can POST arbitrary provider_message_id + status to flip reminder_log rows. Add signature verification once WHATSAPP_APP_SECRET env is available."},
+      {"endpoint": "GET /api/school/reports/*.xlsx", "issue": "_write_header calls `now_utc().isoformat()` returning a Python datetime.isoformat() — inconsistent with the rest of the codebase which uses the helper `iso(now_utc())`. Cosmetic."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Custom Roles / New role dialog", "issues": ["Permission matrix table is wide (14 modules × ~14 action columns) and forces horizontal scroll on 1920px viewports; consider sticky first column (module name) or splitting the modal into tabs per module group (Academics / Finance / Admin). Not blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_phase4.py",
+    "/app/test_reports/pytest/pytest_iter5_phase4.xml",
+    "/app/test_reports/pytest/pytest_iter5_full.xml"
+  ],
+  "action_items": [
+    "MINOR (backend): Make DELETE /school/custom-roles/{rid} return 404 when deleted_count==0 (cross-tenant consistency with PUT).",
+    "MINOR (backend): Simplify the tautological ternary at routes_phase4.py:240-241 (log[\"status\"] always = 'queued' in that branch).",
+    "MINOR (backend, pre-prod): Add X-Hub-Signature-256 HMAC verification on /api/webhooks/whatsapp/status before enabling real WhatsApp integration.",
+    "OPTIONAL (frontend): Custom Roles matrix table needs a sticky first column or module-grouped tabs — currently requires horizontal scroll to see later action columns."
+  ],
+  "critical_code_review_comments": [
+    "routes_phase4._sanitize_perms correctly whitelists modules & actions and drops platform-level scopes (super_admin, unknown_module). Verified via test with mixed valid+invalid+escalation payload.",
+    "routes_phase4.assign_role checks role belongs to same school before assignment (line 162-164) — cross-tenant assign correctly 404s.",
+    "routes_school.pay_create idempotency check `db.ledger.find_one({ref_type:'fee_payment', ref_id:payment_id})` before insert (line 462) works but relies on `payment_id = new_id()` being unique per call; there is NO unique DB index enforcing this, so a race condition (double-click within microseconds) could theoretically double-insert. Consider adding `db.ledger.create_index([('school_id',1),('ref_type',1),('ref_id',1)], unique=True)` at startup for hard idempotency guarantee.",
+    "routes_school.pay_refund similarly relies on `p.get('refunded')` check + non-unique-indexed ledger insert. Same recommendation.",
+    "routes_phase4._wa_send_text uses httpx timeout=15 — good — but doesn't retry on transient errors; production could benefit from 1 retry with exponential backoff on 429/5xx.",
+    "routes_phase4 webhook endpoint has NO signature verification (see minor issue above)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_phase4.py (NEW — 20 Phase 4 tests, 1 skipped conditionally)"
+  ],
+  "success_rate": {
+    "backend": "100% (144/144 passing; 1 conditionally skipped when School B has no invoices — 124 baseline + 20 new Phase 4)",
+    "frontend": "100% smoke — Custom Roles link visible for admin, hidden for teacher; permission matrix dialog opens with 65 checkboxes; assign-role dropdown per user; Reports XLSX buttons all data-testid-tagged (xlsx-students/xlsx-fee/xlsx-exp/xlsx-ledger); CSV buttons preserved."
+  },
+  "test_credentials": "Used /app/memory/test_credentials.md — all 5 accounts logged in successfully.",
+  "seed_data_creation": "TEST_ prefixed rows: custom_roles (TEST_Role_*, TEST_XT_*, TEST_AssignedRole_* — all deleted at end of tests), several fee_invoices (title='TEST_P4_Invoice'), matching fee_payments and ledger entries (kind=credit/debit ref_type=fee_payment/fee_refund). Ledger entries are auto-posted by the new pay_create/pay_refund code so they accumulate on every test run — consider a periodic cleanup fixture in future.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run `cd /app/backend && pytest tests/ -v` for full regression (144 tests, ~45s). WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID intentionally UNSET — do NOT set them in preview .env. Fee payments now write ledger credit; refunds write ledger debit — ANY test that counts ledger entries by school must factor this in. New collections: custom_roles. New fields: users.custom_role_id, fee_payments.refunded/refund_reason/refunded_at/refunded_by, ledger.ref_type in {fee_payment, fee_refund, expense, salary}. Cross-tenant enforced on all Phase 4 endpoints (verified). Frontend Custom Roles page at /app/custom-roles renders a 14×N permission matrix — table is wide and scrolls horizontally.",
+  "rca of the issue": "N/A — no blocking issues. Two cosmetic backend nits (cross-tenant DELETE returns 200 instead of 404 but data is safe; tautological ternary in reminders) and one pre-prod hardening item (webhook signature verification)."
+}

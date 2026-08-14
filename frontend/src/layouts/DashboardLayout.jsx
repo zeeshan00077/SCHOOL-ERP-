@@ -38,6 +38,7 @@ const schoolLinks = [
   { to: "/app/reports", icon: BarChart3, key: "reports" },
   { to: "/app/reminders", icon: MessageCircle, key: "reminders" },
   { to: "/app/users", icon: UserPlus, key: "users" },
+  { to: "/app/custom-roles", icon: ShieldIcon, key: "customRoles" },
   { to: "/app/settings", icon: Cog, key: "settings" },
   { to: "/app/change-password", icon: KeyRound, key: "changePassword" },
 ];
@@ -61,7 +62,7 @@ export default function DashboardLayout({ kind }) {
   const isTeacher = user?.role === "teacher";
   const filteredLinks = links.filter((l) => {
     if (kind === "school" && !isSchoolAdminOnly) {
-      if (["users","settings","reminders","expenses","payroll","admissions","reports"].includes(l.key)) {
+      if (["users","settings","reminders","expenses","payroll","admissions","reports","customRoles"].includes(l.key)) {
         if (!(l.key === "admissions" && user?.role === "receptionist") && !(["expenses","payroll","reports"].includes(l.key) && user?.role === "accountant")) return false;
       }
     }

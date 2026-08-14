@@ -61,6 +61,7 @@ import Reports from "@/pages/school/Reports";
 import Admissions from "@/pages/school/Admissions";
 import PublicEnquiry from "@/pages/PublicEnquiry";
 import SystemSettings from "@/pages/super/SystemSettings";
+import CustomRoles from "@/pages/school/CustomRoles";
 
 function Protected({ role, children }) {
   const { user, checking } = useAuth();
@@ -122,6 +123,7 @@ export default function App() {
                 <Route path="admissions" element={<Admissions />} />
                 <Route path="change-password" element={<ChangePassword />} />
                 <Route path="users" element={<UsersPage />} />
+                <Route path="custom-roles" element={<CustomRoles />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
 
